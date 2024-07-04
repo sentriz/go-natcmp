@@ -6,16 +6,15 @@ import (
 )
 
 // Compare performs a natural comparison between two strings, a and b, suitable for
-// use with [slices.SortFunc] by returning an integer comparing their natural order:
-//
-//	-1 if a < b
-//	 0 if a == b
-//	 1 if a > b
+// use with [slices.SortFunc] by returning an integer comparing their natural order.
 //
 // Natural sorting orders numeric substrings in ascending order and
 // string substrings using lexicographical order.
+// See:
+//   - https://en.wikipedia.org/wiki/Natural_sort_order
+//   - https://web.archive.org/web/20210803201519/http://davekoelle.com/alphanum.html
 //
-// Reference: https://web.archive.org/web/20210803201519/http://davekoelle.com/alphanum.html
+// The result is 0 if a == b, -1 if a < b, and +1 if a > b.
 func Compare(a, b string) int {
 	ach, bch := chunkify(a), chunkify(b)
 	for {

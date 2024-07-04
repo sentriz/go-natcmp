@@ -4,58 +4,77 @@ import (
 	"math/rand/v2"
 	"slices"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
+var rnd = rand.New(rand.NewPCG(1, 2))
+
 func TestCompare(t *testing.T) {
-	assert.Equal(t, -1, Compare("abc10", "abc100"))
-	assert.Equal(t, +1, Compare("abc100", "abc10"))
-	assert.Equal(t, +1, Compare("abc10.20 final.zip", "abc10.10 final.zip"))
-	assert.Equal(t, 0, Compare("", ""))
-	assert.Equal(t, 0, Compare("abc100", "abc100"))
+	eq(t, -1, Compare("abc10", "abc100"))
+	eq(t, +1, Compare("abc100", "abc10"))
+	eq(t, +1, Compare("abc10.20 final.zip", "abc10.10 final.zip"))
+	eq(t, 0, Compare("", ""))
+	eq(t, 0, Compare("abc100", "abc100"))
+
+	resort := func(sorted []string, cmp func(a, b string) int) []string {
+		vs := shuffled(sorted)
+		slices.SortFunc(vs, cmp)
+		return vs
+	}
 
 	for i := 0; i < 16; i++ {
-		assert.Equal(t, sciValues, reSort(sciValues, Compare))
+		eqFunc(t, slices.Equal, sciValues, resort(sciValues, Compare))
 	}
 	for i := 0; i < 16; i++ {
-		assert.Equal(t, docValues, reSort(docValues, Compare))
+		eqFunc(t, slices.Equal, docValues, resort(docValues, Compare))
 	}
 }
 
-func TestChunkify(t *testing.T) {
-	expect := func(ch func() (string, int, bool), expStr string, expI int, expMore bool) {
-		t.Helper()
-		str, i, more := ch()
-		assert.Equal(t, expStr, str)
-		assert.Equal(t, expI, i)
-		assert.Equal(t, expMore, more)
-	}
-
-	ch := chunkify("abc123a")
-	expect(ch, "abc", 0, true)
-	expect(ch, "", 123, true)
-	expect(ch, "a", 0, true)
-	expect(ch, "", 0, false)
-
-	ch = chunkify("abc")
-	expect(ch, "abc", 0, true)
-	expect(ch, "", 0, false)
-
-	ch = chunkify("123")
-	expect(ch, "", 123, true)
-	expect(ch, "", 0, false)
-
-	ch = chunkify("")
-	expect(ch, "", 0, false)
+func FuzzCompareWithSlow(f *testing.F) {
+	f.Fuzz(func(t *testing.T, a, b string) {
+		exp := slowCompare(a, b)
+		got := Compare(a, b)
+		if got != exp {
+			t.Errorf("compare %q %q, exp %d got %d", a, b, exp, got)
+		}
+	})
 }
 
-func reSort[T any](vs []T, cmp func(a, b T) int) []T {
-	vs = slices.Clone(vs)
-	rand.Shuffle(len(vs), func(i, j int) {
+func BenchmarkCompare(b *testing.B) {
+	benchCompare(b, Compare)
+}
+
+func BenchmarkCompareSlow(b *testing.B) {
+	benchCompare(b, slowCompare)
+}
+
+func benchCompare(b *testing.B, cmp func(a, b string) int) {
+	shuff := shuffled(sciValues)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		data := slices.Clone(shuff)
+		b.StartTimer()
+		slices.SortFunc(data, cmp)
+	}
+}
+
+func eq[T comparable](t *testing.T, a, b T) {
+	t.Helper()
+	eqFunc(t, func(a, b T) bool { return a == b }, a, b)
+}
+
+func eqFunc[T any](t *testing.T, eq func(a, b T) bool, a, b T) {
+	t.Helper()
+	if !eq(a, b) {
+		t.Errorf("%+v != %v", a, b)
+	}
+}
+
+func shuffled[T any](sorted []T) []T {
+	vs := slices.Clone(sorted)
+	rnd.Shuffle(len(vs), func(i, j int) {
 		vs[i], vs[j] = vs[j], vs[i]
 	})
-	slices.SortFunc(vs, cmp)
 	return vs
 }
 
